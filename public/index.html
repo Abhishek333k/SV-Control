@@ -4,161 +4,914 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SV Deck</title>
     <style>
-        * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-        body { background: #11121A; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overscroll-behavior-y: none; }
-        
-        #auth-screen, #deck-screen, #loading-screen { display: flex; flex-direction: column; align-items: center; width: 100%; }
-        #deck-screen, #loading-screen { display: none; }
-
-        .pin-input { background: #1E2030; border: 2px solid #565f89; color: #7dcfff; font-size: 32px; padding: 15px; border-radius: 10px; text-align: center; width: 200px; letter-spacing: 10px; margin-bottom: 20px; outline: none; }
-        .btn-primary { background: #bb9af7; color: #11121A; border: none; padding: 15px 40px; font-size: 18px; font-weight: bold; border-radius: 30px; cursor: pointer; }
-        
-        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; width: 90%; max-width: 400px; }
-        .btn { background: #1E2030; border: 1px solid rgba(255,255,255,0.05); border-radius: 20px; padding: 35px 10px; font-size: 16px; font-weight: bold; color: #c0caf5; text-align: center; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 10px; }
-        .btn:active { transform: scale(0.92); }
-        .btn.active-red { background: #f7768e; color: #11121A; border-color: #f7768e; box-shadow: 0 0 20px rgba(247, 118, 142, 0.4); }
-        .btn.error-flash { animation: errorPulse 0.4s ease; }
-        @keyframes errorPulse {
-            0%, 100% { background: #1E2030; border-color: rgba(255,255,255,0.05); }
-            50% { background: #f7768e; border-color: #f7768e; box-shadow: 0 0 25px rgba(247, 118, 142, 0.6); }
+        * {
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
-        /* Game Selector Modal */
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-overlay.active { display: flex; }
-        .modal { background: #1E2030; border: 1px solid rgba(187,154,247,0.3); border-radius: 12px; padding: 20px; width: 90%; max-width: 350px; max-height: 70vh; display: flex; flex-direction: column; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .modal-header h3 { margin: 0; color: #bb9af7; font-size: 14px; letter-spacing: 1px; }
-        .modal-close { background: none; border: none; color: #565f89; font-size: 24px; cursor: pointer; padding: 0; line-height: 1; }
-        .modal-close:hover { color: #f7768e; }
-        .game-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-        .game-item { background: #0D0E15; padding: 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); color: #c0caf5; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.2s ease; }
-        .game-item:active { background: #bb9af7; color: #11121A; }
-        .empty-vault { color: #565f89; text-align: center; padding: 30px; font-size: 13px; }
+        :root {
+            --bg-primary: #11121A;
+            --bg-secondary: #1A1B26;
+            --bg-card: #1E2030;
+            --bg-input: #0D0E15;
+            --accent-primary: #bb9af7;
+            --accent-secondary: #7dcfff;
+            --accent-danger: #f7768e;
+            --accent-warning: #e0af68;
+            --accent-success: #9ece6a;
+            --text-primary: #c0caf5;
+            --text-muted: #565f89;
+            --border-subtle: rgba(255, 255, 255, 0.05);
+            --border-accent: rgba(187, 154, 247, 0.2);
+            --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+            --shadow-glow: 0 0 20px rgba(187, 154, 247, 0.3);
+        }
 
-        /* System Telemetry */
-        .telemetry-bar { width: 90%; max-width: 400px; margin-bottom: 15px; }
-        .telemetry-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-        .telemetry-label { color: #7dcfff; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
-        .telemetry-value { color: #c0caf5; font-size: 12px; font-weight: 700; font-family: 'Consolas', monospace; }
-        .progress-track { background: #0D0E15; border-radius: 6px; height: 8px; overflow: hidden; border: 1px solid rgba(125, 207, 255, 0.2); }
-        .progress-fill { height: 100%; border-radius: 6px; transition: width 0.5s ease, background-color 0.3s ease; }
-        .progress-fill.cpu { background: linear-gradient(90deg, #7dcfff, #bb9af7); }
-        .progress-fill.ram { background: linear-gradient(90deg, #bb9af7, #9d7cd8); }
-        .progress-fill.warning { background: linear-gradient(90deg, #e0af68, #f7768e); }
-        .progress-fill.critical { background: linear-gradient(90deg, #f7768e, #db4b4b); }
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding-bottom: 40px;
+        }
 
-        /* Custom Macros Section */
-        .section-title { color: #565f89; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 2px; margin: 20px 0 10px 0; }
-        .workspace-tabs { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
-        .workspace-tab { background: #1E2030; border: 1px solid rgba(187, 154, 247, 0.2); color: #c0caf5; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
-        .workspace-tab:active { transform: scale(0.95); }
-        .workspace-tab.active { background: #bb9af7; color: #11121A; border-color: #bb9af7; }
-        .custom-macros-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 90%; max-width: 400px; }
+        .screen {
+            display: none;
+            flex-direction: column;
+            min-height: 100vh;
+        }
 
-        /* Clipboard Tools */
-        .clipboard-tools { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: 90%; max-width: 400px; margin-top: 15px; }
-        .clipboard-btn { background: #1E2030; border: 1px solid rgba(125, 207, 255, 0.3); border-radius: 12px; padding: 15px 10px; font-size: 12px; font-weight: 600; color: #7dcfff; text-align: center; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-        .clipboard-btn:active { transform: scale(0.95); background: #7dcfff; color: #11121A; }
-        .clipboard-btn .icon { font-size: 20px; }
+        .screen.active {
+            display: flex;
+        }
 
-        /* Clipboard Modal */
-        .clipboard-modal-content { display: flex; flex-direction: column; gap: 12px; }
-        .clipboard-input { background: #0D0E15; border: 1px solid rgba(125, 207, 255, 0.3); color: #c0caf5; padding: 12px; border-radius: 8px; font-size: 14px; outline: none; min-height: 100px; resize: vertical; }
-        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #bb9af7; color: #11121A; padding: 12px 24px; border-radius: 25px; font-size: 13px; font-weight: 700; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 2000; }
-        .toast.show { opacity: 1; }
+        /* AUTH SCREEN */
+        #auth-screen {
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+        }
+
+        .auth-logo {
+            font-size: 64px;
+            margin-bottom: 10px;
+        }
+
+        .auth-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent-primary);
+            letter-spacing: 3px;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+        }
+
+        .pin-input {
+            background: var(--bg-card);
+            border: 2px solid var(--border-accent);
+            color: var(--accent-secondary);
+            font-size: 36px;
+            font-weight: 700;
+            padding: 20px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 280px;
+            text-align: center;
+            letter-spacing: 12px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .pin-input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .btn-connect {
+            background: linear-gradient(135deg, var(--accent-primary), #9d7cd8);
+            color: var(--bg-primary);
+            border: none;
+            padding: 18px 60px;
+            font-size: 16px;
+            font-weight: 800;
+            border-radius: 30px;
+            margin-top: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn-connect:active {
+            transform: scale(0.95);
+        }
+
+        .error-message {
+            color: var(--accent-danger);
+            font-size: 14px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        /* DECK SCREEN */
+        #deck-screen {
+            padding: 20px;
+        }
+
+        .deck-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-top: 10px;
+        }
+
+        .deck-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent-primary);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .connection-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--accent-success);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* TELEMETRY CARD */
+        .telemetry-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-accent);
+            box-shadow: var(--shadow-card);
+        }
+
+        .telemetry-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .telemetry-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .telemetry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .telemetry-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--accent-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .telemetry-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: 'Consolas', monospace;
+        }
+
+        .telemetry-icon {
+            font-size: 14px;
+        }
+
+        .telemetry-icon.active {
+            color: var(--accent-danger);
+        }
+
+        .progress-track {
+            background: var(--bg-input);
+            border-radius: 6px;
+            height: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-accent);
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.5s ease, background 0.3s ease;
+        }
+
+        .progress-fill.cpu {
+            background: linear-gradient(90deg, #7dcfff, #bb9af7);
+        }
+
+        .progress-fill.ram {
+            background: linear-gradient(90deg, #bb9af7, #9d7cd8);
+        }
+
+        .progress-fill.volume {
+            background: linear-gradient(90deg, #9ece6a, #7dcfff);
+        }
+
+        .progress-fill.warning {
+            background: linear-gradient(90deg, #e0af68, #f7768e);
+        }
+
+        .progress-fill.critical {
+            background: linear-gradient(90deg, #f7768e, #db4b4b);
+        }
+
+        /* SECTIONS */
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* BUTTON GRIDS */
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .button-grid.compact {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .button-grid.wide {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        /* ACTION BUTTONS */
+        .action-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 20px 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-card);
+        }
+
+        .action-btn:active {
+            transform: scale(0.92);
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .action-btn:active .btn-icon,
+        .action-btn:active .btn-label {
+            color: var(--bg-primary);
+        }
+
+        .action-btn.active-red {
+            background: var(--accent-danger);
+            border-color: var(--accent-danger);
+            box-shadow: 0 0 25px rgba(247, 118, 142, 0.5);
+        }
+
+        .action-btn.active-red .btn-icon,
+        .action-btn.active-red .btn-label {
+            color: var(--bg-primary);
+        }
+
+        .action-btn.error-flash {
+            animation: errorPulse 0.4s ease;
+        }
+
+        @keyframes errorPulse {
+            0%, 100% {
+                background: var(--bg-card);
+                border-color: var(--border-subtle);
+            }
+            50% {
+                background: var(--accent-danger);
+                border-color: var(--accent-danger);
+                box-shadow: 0 0 30px rgba(247, 118, 142, 0.6);
+            }
+        }
+
+        .btn-icon {
+            font-size: 28px;
+            transition: color 0.2s ease;
+        }
+
+        .btn-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: center;
+            transition: color 0.2s ease;
+        }
+
+        /* WORKSPACE TABS */
+        .workspace-tabs {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .workspace-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .workspace-tab {
+            background: var(--bg-card);
+            border: 1px solid var(--border-accent);
+            color: var(--text-primary);
+            padding: 8px 14px;
+            border-radius: 16px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .workspace-tab:active {
+            transform: scale(0.95);
+        }
+
+        .workspace-tab.active {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border-color: var(--accent-primary);
+        }
+
+        /* MACRO BUTTONS */
+        .macro-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-accent);
+            border-radius: 12px;
+            padding: 18px 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-height: 80px;
+            justify-content: center;
+        }
+
+        .macro-btn:active {
+            transform: scale(0.92);
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .macro-btn:active .macro-emoji,
+        .macro-btn:active .macro-name {
+            color: var(--bg-primary);
+        }
+
+        .macro-emoji {
+            font-size: 24px;
+        }
+
+        .macro-name {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: center;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* CLIPBOARD BUTTONS */
+        .clipboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .clipboard-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-accent);
+            border-radius: 12px;
+            padding: 18px 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .clipboard-btn:active {
+            transform: scale(0.95);
+            background: var(--accent-secondary);
+            border-color: var(--accent-secondary);
+        }
+
+        .clipboard-btn:active .clip-icon,
+        .clipboard-btn:active .clip-label {
+            color: var(--bg-primary);
+        }
+
+        .clip-icon {
+            font-size: 24px;
+        }
+
+        .clip-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--accent-secondary);
+        }
+
+        /* MODALS */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border-accent);
+            border-radius: 16px;
+            padding: 20px;
+            width: 100%;
+            max-width: 360px;
+            max-height: 70vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .modal-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent-primary);
+            letter-spacing: 1px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 26px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            transition: color 0.2s ease;
+        }
+
+        .modal-close:active {
+            color: var(--accent-danger);
+        }
+
+        .modal-content {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        /* GAME LIST */
+        .game-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .game-item {
+            background: var(--bg-input);
+            padding: 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-primary);
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+        }
+
+        .game-item:active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        .empty-state {
+            color: var(--text-muted);
+            text-align: center;
+            padding: 30px 20px;
+            font-size: 12px;
+        }
+
+        /* CLIPBOARD INPUT */
+        .clipboard-input {
+            background: var(--bg-input);
+            border: 1px solid var(--border-accent);
+            color: var(--text-primary);
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            outline: none;
+            min-height: 100px;
+            resize: vertical;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .clipboard-input:focus {
+            border-color: var(--accent-primary);
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, var(--accent-primary), #9d7cd8);
+            color: var(--bg-primary);
+            border: none;
+            padding: 14px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 10px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-submit:active {
+            transform: scale(0.97);
+        }
+
+        /* TOAST */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            padding: 12px 24px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+            z-index: 2000;
+            box-shadow: 0 5px 20px rgba(187, 154, 247, 0.4);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* LOADING SCREEN */
+        #loading-screen {
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .loading-text {
+            color: var(--accent-secondary);
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 2px;
+        }
+
+        /* FULLSCREEN BUTTON */
+        .fullscreen-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-accent);
+            color: var(--accent-secondary);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fullscreen-btn:active {
+            transform: scale(0.9);
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        /* FULLSCREEN MODE */
+        body.fullscreen #deck-screen {
+            padding-top: 10px;
+        }
+
+        body.fullscreen .telemetry-card {
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
-
-    <div id="loading-screen"><h3 style="color: #7dcfff;">Reconnecting...</h3></div>
-
-    <div id="auth-screen">
-        <h2 style="color: #565f89; margin-bottom: 30px;">ENTER PIN</h2>
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen" class="screen active">
+        <div class="auth-logo">🎮</div>
+        <h1 class="auth-title">SV Deck</h1>
         <input type="text" inputmode="numeric" pattern="[0-9]*" id="pin-box" class="pin-input" placeholder="----" maxlength="4" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-        <button class="btn-primary" onclick="attemptLogin()">CONNECT</button>
-        <p id="error-msg" style="color: #f7768e; display: none; margin-top: 15px;">Invalid PIN</p>
+        <button class="btn-connect" onclick="attemptLogin()">Connect</button>
+        <p id="error-msg" class="error-message">Invalid PIN</p>
     </div>
 
-    <div id="deck-screen">
-        <!-- System Telemetry -->
-        <div class="telemetry-bar">
-            <div class="telemetry-row">
-                <span class="telemetry-label">CPU</span>
-                <span class="telemetry-value" id="cpu-value">0%</span>
-            </div>
-            <div class="progress-track">
-                <div class="progress-fill cpu" id="cpu-bar" style="width: 0%"></div>
-            </div>
-        </div>
-        <div class="telemetry-bar">
-            <div class="telemetry-row">
-                <span class="telemetry-label">RAM</span>
-                <span class="telemetry-value" id="ram-value">0%</span>
-            </div>
-            <div class="progress-track">
-                <div class="progress-fill ram" id="ram-bar" style="width: 0%"></div>
+    <!-- LOADING SCREEN -->
+    <div id="loading-screen" class="screen">
+        <p class="loading-text">Reconnecting...</p>
+    </div>
+
+    <!-- DECK SCREEN -->
+    <div id="deck-screen" class="screen">
+        <div class="deck-header">
+            <span class="deck-title">SV Control</span>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <div class="connection-dot"></div>
+                <button class="fullscreen-btn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
             </div>
         </div>
 
-        <h3 style="color: #565f89; margin: 20px 0 15px 0; letter-spacing: 2px;">COMMAND CENTER</h3>
-        <div class="grid">
-            <div class="btn" id="btn-MUTE_MIC" onclick="trigger('MUTE_MIC', this)"><span style="font-size: 24px;">🎙️</span> Mic Mute</div>
-            <div class="btn" onclick="trigger('PLAY_MEDIA', this)"><span style="font-size: 24px;">⏯️</span> Play/Pause</div>
-            <div class="btn" onclick="openGameSelector()"><span style="font-size: 24px;">🎮</span> Launch Game</div>
-            <div class="btn" onclick="trigger('FLUSH_RAM', this)"><span style="font-size: 24px;">🚀</span> Flush RAM</div>
+        <!-- Telemetry Card -->
+        <div class="telemetry-card">
+            <div class="telemetry-grid" style="grid-template-columns: repeat(2, 1fr);">
+                <div class="telemetry-item">
+                    <div class="telemetry-header">
+                        <span class="telemetry-label">CPU</span>
+                        <span class="telemetry-value" id="cpu-value">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill cpu" id="cpu-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-header">
+                        <span class="telemetry-label">RAM</span>
+                        <span class="telemetry-value" id="ram-value">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill ram" id="ram-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-header">
+                        <span class="telemetry-label">Volume</span>
+                        <span class="telemetry-value" id="volume-value">50%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill volume" id="volume-bar" style="width: 50%"></div>
+                    </div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-header">
+                        <span class="telemetry-label">Mic</span>
+                        <span class="telemetry-icon" id="mic-icon">🎙️</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="mic-bar" style="width: 100%; background: var(--accent-success);"></div>
+                    </div>
+                </div>
+                <div class="telemetry-item" style="grid-column: 1 / -1;">
+                    <div class="telemetry-header">
+                        <span class="telemetry-label">Brightness</span>
+                        <span class="telemetry-value" id="brightness-value">100%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" id="brightness-bar" style="width: 100%; background: linear-gradient(90deg, #e0af68, #f7768e);"></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <h3 class="section-title">Custom Macros</h3>
-        <div class="workspace-tabs" id="workspace-tabs"></div>
-        <div class="custom-macros-grid" id="custom-macros-grid"></div>
-
-        <h3 class="section-title">Clipboard Tools</h3>
-        <div class="clipboard-tools">
-            <div class="clipboard-btn" onclick="openClipboardModal()">
-                <span class="icon">📤</span>
-                <span>Send to PC</span>
+        <!-- Core Commands -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-title">Core Commands</span>
             </div>
-            <div class="clipboard-btn" onclick="fetchClipboardFromPc()">
-                <span class="icon">📥</span>
-                <span>Get from PC</span>
+            <div class="button-grid">
+                <div class="action-btn" id="btn-MUTE_MIC" onclick="trigger('MUTE_MIC', this, event)">
+                    <span class="btn-icon">🎙️</span>
+                    <span class="btn-label">Mic Mute</span>
+                </div>
+                <div class="action-btn" onclick="trigger('PLAY_MEDIA', this, event)">
+                    <span class="btn-icon">⏯️</span>
+                    <span class="btn-label">Play/Pause</span>
+                </div>
+                <div class="action-btn" onclick="openGameSelector()">
+                    <span class="btn-icon">🎮</span>
+                    <span class="btn-label">Launch Game</span>
+                </div>
+                <div class="action-btn" onclick="trigger('FLUSH_RAM', this, event)">
+                    <span class="btn-icon">🚀</span>
+                    <span class="btn-label">Flush RAM</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Volume Control -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-title">Volume Control</span>
+            </div>
+            <div class="button-grid wide">
+                <div class="action-btn" onclick="trigger('PREV_TRACK', this, event)">
+                    <span class="btn-icon">⏮️</span>
+                    <span class="btn-label">Prev</span>
+                </div>
+                <div class="action-btn" onclick="trigger('VOLUME_DOWN', this, event)">
+                    <span class="btn-icon">🔉</span>
+                    <span class="btn-label">Vol -</span>
+                </div>
+                <div class="action-btn" onclick="trigger('VOLUME_UP', this, event)">
+                    <span class="btn-icon">🔊</span>
+                    <span class="btn-label">Vol +</span>
+                </div>
+                <div class="action-btn" onclick="trigger('NEXT_TRACK', this, event)">
+                    <span class="btn-icon">⏭️</span>
+                    <span class="btn-label">Next</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Brightness Control -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-title">Brightness Control</span>
+            </div>
+            <div class="button-grid">
+                <div class="action-btn" onclick="trigger('BRIGHTNESS_DOWN', this, event)">
+                    <span class="btn-icon">🌑</span>
+                    <span class="btn-label">Dimmer</span>
+                </div>
+                <div class="action-btn" onclick="trigger('BRIGHTNESS_UP', this, event)">
+                    <span class="btn-icon">☀️</span>
+                    <span class="btn-label">Brighter</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Power & System -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-title">Power & System</span>
+            </div>
+            <div class="button-grid">
+                <div class="action-btn" onclick="trigger('LOCK_PC', this, event)">
+                    <span class="btn-icon">🔒</span>
+                    <span class="btn-label">Lock PC</span>
+                </div>
+                <div class="action-btn" onclick="trigger('SLEEP_PC', this, event)">
+                    <span class="btn-icon">💤</span>
+                    <span class="btn-label">Sleep</span>
+                </div>
+                <div class="action-btn" onclick="trigger('OPEN_TASK_MANAGER', this, event)">
+                    <span class="btn-icon">📊</span>
+                    <span class="btn-label">TaskMgr</span>
+                </div>
+                <div class="action-btn" onclick="trigger('LAUNCH_BROWSER', this, event)">
+                    <span class="btn-icon">🌐</span>
+                    <span class="btn-label">Browser</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Macros -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-title">Custom Macros</span>
+            </div>
+            <div class="workspace-tabs" id="workspace-tabs"></div>
+            <div class="button-grid compact" id="custom-macros-grid"></div>
+        </div>
+
+        <!-- Clipboard Tools -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-title">Clipboard</span>
+            </div>
+            <div class="clipboard-grid">
+                <div class="clipboard-btn" onclick="openClipboardModal()">
+                    <span class="clip-icon">📤</span>
+                    <span class="clip-label">Send to PC</span>
+                </div>
+                <div class="clipboard-btn" onclick="fetchClipboardFromPc()">
+                    <span class="clip-icon">📥</span>
+                    <span class="clip-label">Get from PC</span>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Game Selector Modal -->
+    <!-- GAME SELECTOR MODAL -->
     <div class="modal-overlay" id="game-modal">
         <div class="modal">
             <div class="modal-header">
-                <h3>🎮 SELECT GAME</h3>
+                <span class="modal-title">🎮 Launch Game</span>
                 <button class="modal-close" onclick="closeGameSelector()">×</button>
             </div>
-            <div class="game-list" id="game-list"></div>
+            <div class="modal-content">
+                <div class="game-list" id="game-list"></div>
+            </div>
         </div>
     </div>
 
-    <!-- Clipboard Modal -->
+    <!-- ADD GAME MODAL (Mobile) -->
+    <div class="modal-overlay" id="add-game-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">📁 Add Game to Vault</span>
+                <button class="modal-close" onclick="closeAddGameModal()">×</button>
+            </div>
+            <div class="modal-content" style="text-align: center; padding: 20px;">
+                <p style="color: var(--text-muted); margin-bottom: 20px;">Click the button below to select a game executable from your PC</p>
+                <button class="btn-submit" onclick="mobileAddGame()">📂 Browse Games</button>
+                <div id="add-game-result" style="margin-top: 15px; font-size: 12px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLIPBOARD MODAL -->
     <div class="modal-overlay" id="clipboard-modal">
         <div class="modal">
             <div class="modal-header">
-                <h3>📤 SEND TO PC</h3>
+                <span class="modal-title">📤 Send to PC</span>
                 <button class="modal-close" onclick="closeClipboardModal()">×</button>
             </div>
-            <div class="clipboard-modal-content">
+            <div class="modal-content">
                 <textarea class="clipboard-input" id="clipboard-text" placeholder="Type text to send to PC clipboard..."></textarea>
-                <button class="btn-primary" style="width: 100%; padding: 12px;" onclick="sendClipboardToPc()">SEND TO PC</button>
+                <button class="btn-submit" onclick="sendClipboardToPc()">Send to PC</button>
             </div>
         </div>
     </div>
 
-    <!-- Toast Notification -->
+    <!-- TOAST -->
     <div class="toast" id="toast">Copied!</div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
 
-        // 🟢 THE FIX: Shift to localStorage
         let savedToken = localStorage.getItem('sv_token');
         let gameVault = [];
         let customActions = [];
@@ -166,12 +919,11 @@
         let lastActionBtn = null;
         const workspaces = ['Default', 'Streaming', 'Dev', 'Gaming', 'Productivity'];
 
-        // Auto-Reconnect Logic
         socket.on('connect', () => {
             if (savedToken) {
-                document.getElementById('auth-screen').style.display = 'none';
-                document.getElementById('deck-screen').style.display = 'none';
-                document.getElementById('loading-screen').style.display = 'flex';
+                document.getElementById('auth-screen').classList.remove('active');
+                document.getElementById('deck-screen').classList.remove('active');
+                document.getElementById('loading-screen').classList.add('active');
                 socket.emit('reconnect-session', savedToken);
             }
         });
@@ -182,14 +934,16 @@
         }
 
         socket.on('auth-success', (data) => {
-            // 🟢 THE FIX: Save to localStorage
             localStorage.setItem('sv_token', data.token);
 
-            document.getElementById('loading-screen').style.display = 'none';
-            document.getElementById('auth-screen').style.display = 'none';
-            document.getElementById('deck-screen').style.display = 'flex';
+            document.getElementById('loading-screen').classList.remove('active');
+            document.getElementById('auth-screen').classList.remove('active');
+            document.getElementById('deck-screen').classList.add('active');
 
-            if (data.micMuted) document.getElementById('btn-MUTE_MIC').classList.add('active-red');
+            if (data.micMuted) updateMicState(true);
+            if (data.telemetry) {
+                updateTelemetry(data.telemetry);
+            }
             if (data.customActions) {
                 customActions = data.customActions;
                 renderWorkspaceTabs();
@@ -199,32 +953,30 @@
         });
 
         socket.on('auth-failed', () => {
-            document.getElementById('loading-screen').style.display = 'none';
-            document.getElementById('auth-screen').style.display = 'flex';
+            document.getElementById('loading-screen').classList.remove('active');
+            document.getElementById('auth-screen').classList.add('active');
             document.getElementById('error-msg').style.display = 'block';
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         });
 
-        // The Scorch Earth Protocol (PC kicked us or 5 mins passed)
         socket.on('session-expired', () => {
-            // 🟢 THE FIX: Wipe from localStorage
             localStorage.removeItem('sv_token');
             savedToken = null;
 
             document.getElementById('pin-box').value = '';
-            document.getElementById('loading-screen').style.display = 'none';
-            document.getElementById('deck-screen').style.display = 'none';
-            document.getElementById('auth-screen').style.display = 'flex';
+            document.getElementById('loading-screen').classList.remove('active');
+            document.getElementById('deck-screen').classList.remove('active');
+            document.getElementById('auth-screen').classList.add('active');
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         });
 
-        function trigger(actionId, btnElement) {
+        function trigger(actionId, btnElement, event) {
+            if (event) event.preventDefault();
             lastActionBtn = btnElement;
             socket.emit('trigger-action', actionId);
             if (navigator.vibrate) navigator.vibrate(20);
         }
 
-        // Game Vault Functions
         function openGameSelector() {
             socket.emit('get-game-vault');
         }
@@ -233,17 +985,54 @@
             document.getElementById('game-modal').classList.remove('active');
         }
 
+        function openAddGameModal() {
+            document.getElementById('add-game-modal').classList.add('active');
+            document.getElementById('add-game-result').innerHTML = '';
+        }
+
+        function closeAddGameModal() {
+            document.getElementById('add-game-modal').classList.remove('active');
+        }
+
+        async function mobileAddGame() {
+            const resultEl = document.getElementById('add-game-result');
+            resultEl.innerHTML = 'Selecting game...';
+            try {
+                const result = await window.svHost.mobileAddGame();
+                if (result.success) {
+                    resultEl.innerHTML = `<span style="color: var(--accent-success);">✓ Added: ${escapeHTML(result.name)}</span>`;
+                    if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+                    setTimeout(() => {
+                        closeAddGameModal();
+                        socket.emit('get-game-vault');
+                    }, 1500);
+                } else {
+                    resultEl.innerHTML = `<span style="color: var(--accent-danger);">Cancelled</span>`;
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                }
+            } catch (err) {
+                resultEl.innerHTML = `<span style="color: var(--accent-danger);">Error: ${err.message}</span>`;
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            }
+        }
+
         function renderGameSelector(games) {
             const listEl = document.getElementById('game-list');
 
             if (games.length === 0) {
-                listEl.innerHTML = '<div class="empty-vault">No games in vault. Add games from the PC first!</div>';
+                listEl.innerHTML = `
+                    <div class="empty-state">No games in vault.</div>
+                    <button class="btn-submit" style="margin-top: 15px;" onclick="openAddGameModal()">+ Add Game</button>
+                `;
                 return;
             }
 
-            listEl.innerHTML = games.map(game => `
-                <div class="game-item" onclick="launchGame('${game.path.replace(/\\/g, '\\\\')}')">${escapeHTML(game.name)}</div>
-            `).join('');
+            listEl.innerHTML = `
+                <button class="btn-submit" style="margin-bottom: 10px;" onclick="openAddGameModal()">+ Add New Game</button>
+                ${games.map(game => `
+                    <div class="game-item" onclick="launchGame('${game.path.replace(/\\/g, '\\\\')}')">${escapeHTML(game.name)}</div>
+                `).join('')}
+            `;
 
             document.getElementById('game-modal').classList.add('active');
         }
@@ -268,14 +1057,30 @@
             }
         }
 
+        function updateMicState(isMuted) {
+            const btn = document.getElementById('btn-MUTE_MIC');
+            const micIcon = document.getElementById('mic-icon');
+            const micBar = document.getElementById('mic-bar');
+            
+            if (isMuted) {
+                btn.classList.add('active-red');
+                micIcon.textContent = '🔇';
+                micIcon.classList.add('active');
+                micBar.style.background = 'var(--accent-danger)';
+            } else {
+                btn.classList.remove('active-red');
+                micIcon.textContent = '🎙️';
+                micIcon.classList.remove('active');
+                micBar.style.background = 'var(--accent-success)';
+            }
+        }
+
         socket.on('state-update', (data) => {
             if (data.actionId === 'MUTE_MIC') {
-                const btn = document.getElementById('btn-MUTE_MIC');
+                updateMicState(data.state);
                 if (data.state) {
-                    btn.classList.add('active-red');
                     if (navigator.vibrate) navigator.vibrate([50]);
                 } else {
-                    btn.classList.remove('active-red');
                     if (navigator.vibrate) navigator.vibrate([20]);
                 }
             }
@@ -292,7 +1097,7 @@
         });
 
         socket.on('telemetry-update', (data) => {
-            updateTelemetry(data.cpu, data.ram);
+            updateTelemetry(data);
         });
 
         socket.on('custom-actions-updated', (actions) => {
@@ -301,33 +1106,55 @@
             renderCustomMacros();
         });
 
-        function updateTelemetry(cpu, ram) {
+        function updateTelemetry(data) {
+            // CPU
             const cpuBar = document.getElementById('cpu-bar');
             const cpuValue = document.getElementById('cpu-value');
+            cpuBar.style.width = data.cpu + '%';
+            cpuValue.textContent = data.cpu + '%';
+            cpuBar.className = 'progress-fill cpu' + (data.cpu >= 80 ? ' warning' : '') + (data.cpu >= 95 ? ' critical' : '');
+
+            // RAM
             const ramBar = document.getElementById('ram-bar');
             const ramValue = document.getElementById('ram-value');
+            ramBar.style.width = data.ram + '%';
+            ramValue.textContent = data.ram + '%';
+            ramBar.className = 'progress-fill ram' + (data.ram >= 80 ? ' warning' : '') + (data.ram >= 95 ? ' critical' : '');
 
-            cpuBar.style.width = cpu + '%';
-            cpuValue.textContent = cpu + '%';
-            cpuBar.className = 'progress-fill cpu' + (cpu >= 80 ? ' warning' : '') + (cpu >= 95 ? ' critical' : '');
+            // Volume
+            if (data.volume !== undefined) {
+                const volBar = document.getElementById('volume-bar');
+                const volValue = document.getElementById('volume-value');
+                volBar.style.width = data.volume + '%';
+                volValue.textContent = data.volume + '%';
+            }
 
-            ramBar.style.width = ram + '%';
-            ramValue.textContent = ram + '%';
-            ramBar.className = 'progress-fill ram' + (ram >= 80 ? ' warning' : '') + (ram >= 95 ? ' critical' : '');
+            // Brightness
+            if (data.brightness !== undefined) {
+                const brightBar = document.getElementById('brightness-bar');
+                const brightValue = document.getElementById('brightness-value');
+                brightBar.style.width = data.brightness + '%';
+                brightValue.textContent = data.brightness + '%';
+            }
+
+            // Mic
+            if (data.micMuted !== undefined) {
+                updateMicState(data.micMuted);
+            }
         }
 
         function renderCustomMacros() {
             const grid = document.getElementById('custom-macros-grid');
             const filtered = customActions.filter(a => a.workspace === currentWorkspace);
-            
+
             if (filtered.length === 0) {
-                grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #565f89; font-size: 12px; padding: 20px;">No macros in this workspace</div>';
+                grid.innerHTML = '<div class="empty-state" style="grid-column: 1/-1; padding: 20px;">No macros in this workspace</div>';
                 return;
             }
             grid.innerHTML = filtered.map(action => `
                 <div class="macro-btn" onclick="triggerCustomAction('${action.id}', this)">
                     <span class="macro-emoji">${escapeHTML(action.emoji)}</span>
-                    <span>${escapeHTML(action.name)}</span>
+                    <span class="macro-name">${escapeHTML(action.name)}</span>
                 </div>
             `).join('');
         }
@@ -352,7 +1179,6 @@
             if (navigator.vibrate) navigator.vibrate(20);
         }
 
-        // Clipboard Functions
         function openClipboardModal() {
             document.getElementById('clipboard-modal').classList.add('active');
             document.getElementById('clipboard-text').value = '';
@@ -368,30 +1194,38 @@
                 if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
                 return;
             }
-            const success = await window.svHost.syncClipboardToPc(text);
-            if (success) {
-                showToast('Sent to PC!');
-                if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-                closeClipboardModal();
-            } else {
-                showToast('Failed to send');
+            try {
+                const result = await window.svHost.syncClipboardToPc(text);
+                if (result.success) {
+                    showToast('Sent to PC!');
+                    if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+                    closeClipboardModal();
+                } else {
+                    showToast('Failed: ' + (result.error || 'Unknown error'));
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message);
                 if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             }
         }
 
         async function fetchClipboardFromPc() {
             try {
-                const text = await window.svHost.fetchClipboardFromPc();
-                if (text) {
-                    await navigator.clipboard.writeText(text);
+                const result = await window.svHost.fetchClipboardFromPc();
+                if (result.success && result.text) {
+                    await navigator.clipboard.writeText(result.text);
                     showToast('Copied!');
                     if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-                } else {
+                } else if (result.success) {
                     showToast('PC clipboard is empty');
                     if (navigator.vibrate) navigator.vibrate(20);
+                } else {
+                    showToast('Failed to fetch');
+                    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
                 }
             } catch (err) {
-                showToast('Failed to fetch');
+                showToast('Error: ' + err.message);
                 if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             }
         }
@@ -402,6 +1236,24 @@
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 2000);
         }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log('Fullscreen error:', err);
+                });
+                document.body.classList.add('fullscreen');
+            } else {
+                document.exitFullscreen();
+                document.body.classList.remove('fullscreen');
+            }
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                document.body.classList.remove('fullscreen');
+            }
+        });
     </script>
 </body>
 </html>

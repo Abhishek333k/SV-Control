@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('svHost', {
     deleteCustomAction: (actionId) => ipcRenderer.invoke('delete-custom-action', actionId),
     syncClipboardToPc: (text) => ipcRenderer.invoke('sync-clipboard-to-pc', text),
     fetchClipboardFromPc: () => ipcRenderer.invoke('fetch-clipboard-from-pc'),
+    mobileAddGame: () => ipcRenderer.invoke('mobile-add-game'),
 
     onShowQr: (callback) => ipcRenderer.on('show-qr', (event, data) => callback(data)),
     onDeviceConnected: (callback) => ipcRenderer.on('device-connected', (event, msg) => callback(msg)),

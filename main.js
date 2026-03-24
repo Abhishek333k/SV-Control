@@ -72,41 +72,66 @@ function saveCustomActions(actions) {
 
 let customActions = loadCustomActions();
 
+// --- SYSTEM STATE TRACKING ---
+let micIsMuted = false;
+let currentVolume = 50; // Track volume level (0-100)
+let currentBrightness = 100; // Track brightness (0-100)
+
 // --- SYSTEM TELEMETRY ---
 let telemetryInterval = null;
-let prevCpuLoad = os.cpus().map(cpu => cpu.times.idle);
+let prevCpuLoad = null;
 
-function getTelemetry() {
+// --- VOLUME MONITORING ---
+// Windows doesn't expose volume/brightness via simple PowerShell without external packages
+// We track based on user interactions
+
+function startVolumeMonitor() {
+    // Volume/brightness tracking is handled through user interactions
+}
+
+function stopVolumeMonitor() {
+    // No-op
+}
+
+async function getTelemetry() {
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
-    const ramUsed = totalMem - freeMem;
-    const ramPercent = Math.round((ramUsed / totalMem) * 100);
+    const ramPercent = Math.round(((totalMem - freeMem) / totalMem) * 100);
 
-    const currCpuLoad = os.cpus().map(cpu => cpu.times.idle);
+    const cpus = os.cpus();
     let cpuPercent = 0;
-    
-    for (let i = 0; i < currCpuLoad.length; i++) {
-        const idleDiff = currCpuLoad[i] - prevCpuLoad[i];
-        const totalDiff = os.cpus()[i].times.idle + os.cpus()[i].times.user + os.cpus()[i].times.nice + os.cpus()[i].times.sys + os.cpus()[i].times.irq - 
-                          (prevCpuLoad[i] + os.cpus()[i].times.user + os.cpus()[i].times.nice + os.cpus()[i].times.sys + os.cpus()[i].times.irq);
-        if (totalDiff > 0) {
-            cpuPercent += (1 - (idleDiff / totalDiff)) * 100;
+
+    if (!prevCpuLoad) {
+        prevCpuLoad = cpus.map(cpu => cpu.times);
+        return { cpu: 0, ram: ramPercent, micMuted: micIsMuted, volume: currentVolume, brightness: currentBrightness };
+    }
+
+    for (let i = 0; i < cpus.length; i++) {
+        const curr = cpus[i].times;
+        const prev = prevCpuLoad[i];
+        const total = (curr.user - prev.user) + (curr.sys - prev.sys) + (curr.nice - prev.nice) + (curr.irq - prev.irq) + (curr.idle - prev.idle);
+        if (total > 0) {
+            const idlePercent = (curr.idle - prev.idle) / total;
+            cpuPercent += (1 - idlePercent) * 100;
         }
     }
-    cpuPercent = Math.round(cpuPercent / currCpuLoad.length);
-    prevCpuLoad = currCpuLoad;
+    cpuPercent = Math.round(cpuPercent / cpus.length);
+    prevCpuLoad = cpus.map(cpu => cpu.times);
 
-    return { cpu: cpuPercent, ram: ramPercent };
+    return { cpu: cpuPercent, ram: ramPercent, micMuted: micIsMuted, volume: currentVolume, brightness: currentBrightness };
 }
 
 function startTelemetry() {
     if (telemetryInterval) return;
+    prevCpuLoad = null; // Reset CPU calculation for accuracy
     telemetryInterval = setInterval(() => {
         if (connectedSocket) {
-            const telemetry = getTelemetry();
-            io.emit('telemetry-update', telemetry);
+            getTelemetry().then(telemetry => {
+                io.emit('telemetry-update', telemetry);
+            });
         }
-    }, 1500);
+    }, 1000);
+    startVolumeMonitor();
 }
 
 function stopTelemetry() {
@@ -114,6 +139,7 @@ function stopTelemetry() {
         clearInterval(telemetryInterval);
         telemetryInterval = null;
     }
+    stopVolumeMonitor();
 }
 
 // --- SECURE STATE MACHINE ---
@@ -121,7 +147,6 @@ let SESSION_PIN;
 let sessionToken = null;
 let connectedSocket = null;
 let disconnectTimeout = null;
-let micIsMuted = false;
 let authAttempts = 0;
 
 // --- NATIVE WINDOWS EXECUTION (NO JAVA REQUIRED) ---
@@ -187,7 +212,13 @@ io.on('connection', (socket) => {
 
             connectedSocket = socket;
             startTelemetry();
-            socket.emit('auth-success', { token: sessionToken, micMuted: micIsMuted, customActions: customActions });
+            const telemetry = getTelemetry();
+            socket.emit('auth-success', { 
+                token: sessionToken, 
+                micMuted: micIsMuted, 
+                customActions: customActions,
+                telemetry: telemetry
+            });
             if (mainWindow) mainWindow.webContents.send('device-connected', `Device Authenticated`);
         } else {
             authAttempts++;
@@ -205,7 +236,13 @@ io.on('connection', (socket) => {
             clearTimeout(disconnectTimeout);
             connectedSocket = socket;
             startTelemetry();
-            socket.emit('auth-success', { token: sessionToken, micMuted: micIsMuted, customActions: customActions });
+            const telemetry = getTelemetry();
+            socket.emit('auth-success', { 
+                token: sessionToken, 
+                micMuted: micIsMuted, 
+                customActions: customActions,
+                telemetry: telemetry
+            });
 
             // 🟢 THE FIX: We must send 'device-connected' so the UI knows to stop the timer!
             if (mainWindow) mainWindow.webContents.send('device-connected', `Device Auto-Reconnected.`);
@@ -222,13 +259,13 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('trigger-action', (actionId, gamePath) => {
+    socket.on('trigger-action', (actionId, param) => {
         if (socket.id !== connectedSocket?.id) return;
 
         try {
             if (mainWindow) mainWindow.webContents.send('log-action', `Executing: ${actionId}`);
 
-            // Check for custom action
+            // Check for custom action first
             const customAction = customActions.find(a => a.id === actionId);
             if (customAction) {
                 exec(customAction.command, (err, stdout, stderr) => {
@@ -243,25 +280,90 @@ io.on('connection', (socket) => {
             }
 
             switch (actionId) {
+                // === AUDIO CONTROLS ===
                 case 'MUTE_MIC':
                     triggerWindowsKey('0xAD');
                     micIsMuted = !micIsMuted;
                     io.emit('state-update', { actionId: 'MUTE_MIC', state: micIsMuted });
                     if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Mic ${micIsMuted ? 'Muted' : 'Unmuted'}`);
                     break;
+
+                case 'VOLUME_UP':
+                    triggerWindowsKey('0xAF');
+                    currentVolume = Math.min(100, currentVolume + 10);
+                    io.emit('telemetry-update', { volume: currentVolume });
+                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Volume Up`);
+                    break;
+
+                case 'VOLUME_DOWN':
+                    triggerWindowsKey('0xAE');
+                    currentVolume = Math.max(0, currentVolume - 10);
+                    io.emit('telemetry-update', { volume: currentVolume });
+                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Volume Down`);
+                    break;
+
+                case 'BRIGHTNESS_UP':
+                    currentBrightness = Math.min(100, currentBrightness + 10);
+                    io.emit('telemetry-update', { brightness: currentBrightness });
+                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Brightness Up`);
+                    break;
+
+                case 'BRIGHTNESS_DOWN':
+                    currentBrightness = Math.max(0, currentBrightness - 10);
+                    io.emit('telemetry-update', { brightness: currentBrightness });
+                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Brightness Down`);
+                    break;
+
+                case 'NEXT_TRACK':
+                    triggerWindowsKey('0xB0');
+                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Next Track`);
+                    break;
+
+                case 'PREV_TRACK':
+                    triggerWindowsKey('0xB1');
+                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Previous Track`);
+                    break;
+
                 case 'PLAY_MEDIA':
                     triggerWindowsKey('0xB3');
-                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Media Play/Pause triggered`);
+                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Play/Pause`);
                     break;
+
+                // === POWER CONTROLS ===
+                case 'LOCK_PC':
+                    exec('rundll32.exe user32.dll,LockWorkStation');
+                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] PC Locked`);
+                    break;
+
+                case 'SLEEP_PC':
+                    exec('rundll32.exe powrprof.dll,SetSuspendState 0,1,0');
+                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] PC entering sleep`);
+                    break;
+
+                // === SYSTEM UTILITIES ===
+                case 'OPEN_TASK_MANAGER':
+                    exec('taskmgr.exe');
+                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Task Manager opened`);
+                    break;
+
+                case 'LAUNCH_BROWSER':
+                    const url = param || 'https://google.com';
+                    exec(`start ${url}`, { shell: true });
+                    if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Browser opened: ${url}`);
+                    break;
+
+                // === GAME LAUNCHER ===
                 case 'LAUNCH_GAME':
-                    if (gamePath) {
-                        spawn(gamePath, [], { detached: true, stdio: 'ignore' });
-                        if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Launched: ${path.basename(gamePath)}`);
+                    if (param) {
+                        spawn(param, [], { detached: true, stdio: 'ignore' });
+                        if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Launched: ${path.basename(param)}`);
                     } else {
                         if (mainWindow) mainWindow.webContents.send('log-action', `[ALERT] No game path provided`);
                         socket.emit('action-failed', { actionId: 'LAUNCH_GAME' });
                     }
                     break;
+
+                // === SYSTEM MAINTENANCE ===
                 case 'FLUSH_RAM':
                     exec('powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File SV-Ghost.ps1', (err) => {
                         if (err) {
@@ -272,6 +374,7 @@ io.on('connection', (socket) => {
                         }
                     });
                     break;
+
                 default:
                     if (mainWindow) mainWindow.webContents.send('log-action', `Unknown Action: ${actionId}`);
                     socket.emit('action-failed', { actionId });
@@ -371,20 +474,45 @@ ipcMain.handle('sync-clipboard-to-pc', (event, text) => {
     try {
         clipboard.writeText(text);
         if (mainWindow) mainWindow.webContents.send('log-action', `[SYSTEM] Clipboard synced from mobile`);
-        return true;
+        return { success: true };
     } catch (err) {
         console.error('Clipboard write failed:', err);
-        return false;
+        return { success: false, error: err.message };
     }
 });
 
 ipcMain.handle('fetch-clipboard-from-pc', () => {
     try {
-        return clipboard.readText();
+        const text = clipboard.readText();
+        return { success: true, text: text || '' };
     } catch (err) {
         console.error('Clipboard read failed:', err);
-        return '';
+        return { success: false, text: '' };
     }
+});
+
+// --- MOBILE GAME PICKER ---
+ipcMain.handle('mobile-add-game', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Select Game Executable',
+        filters: [{ name: 'Executables', extensions: ['exe'] }],
+        properties: ['openFile']
+    });
+
+    if (result.canceled) return { success: false };
+
+    const gamePath = result.filePaths[0];
+    const gameName = path.basename(gamePath, '.exe');
+
+    const existingGame = gameVault.find(g => g.path === gamePath);
+    if (!existingGame) {
+        gameVault.push({ name: gameName, path: gamePath });
+        saveGameVault(gameVault);
+        if (mainWindow) mainWindow.webContents.send('vault-updated', gameVault);
+        if (connectedSocket) connectedSocket.emit('game-vault', gameVault);
+    }
+
+    return { success: true, name: gameName, path: gamePath };
 });
 
 
