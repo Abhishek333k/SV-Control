@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        * { box-sizing: border-box; }
+        body { background: #11121A; color: #c0caf5; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; display: flex; flex-direction: column; width: 100vw; height: 100vh; overflow: hidden; user-select: none; }
+        
+        /* Premium Titlebar */
+        .titlebar { width: 100%; height: 45px; background: #151621; -webkit-app-region: drag; display: flex; justify-content: space-between; align-items: center; padding: 0 15px; border-bottom: 1px solid rgba(187,154,247,0.1); flex-shrink: 0; }
+        .titlebar span { font-weight: 700; color: #bb9af7; font-size: 13px; letter-spacing: 1.5px;}
+        .close-btn { -webkit-app-region: no-drag; cursor: pointer; color: #565f89; padding: 6px 12px; border-radius: 6px; transition: all 0.2s ease;}
+        .close-btn:hover { color: #11121A; background: #f7768e; }
+        
+        .container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 25px; width: 100%; overflow: hidden; }
+        
+        /* QR Lock Screen */
+        #qr-screen { display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .qr-box { background: #1E2030; padding: 15px; border-radius: 18px; margin: 25px 0; border: 1px solid rgba(187,154,247,0.2); box-shadow: 0 15px 35px rgba(0,0,0,0.6); }
+        .pin-display { font-size: 52px; font-family: 'Consolas', monospace; font-weight: 800; color: #7dcfff; letter-spacing: 12px; margin: 10px 0; text-shadow: 0 0 20px rgba(125, 207, 255, 0.3); }
+        
+        /* Command Dashboard */
+        #dash-screen { display: none; flex-direction: column; width: 100%; flex: 1; min-height: 0; overflow: hidden; }
+        
+        .status-bar { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; background: rgba(125, 207, 255, 0.05); border: 1px solid rgba(125, 207, 255, 0.3); padding: 15px 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .status-dot { color: #7dcfff; font-weight: 600; display: flex; align-items: center; gap: 12px; font-size: 14px; letter-spacing: 0.5px;}
+        .status-dot::before { content: ''; width: 10px; height: 10px; background: #7dcfff; border-radius: 50%; box-shadow: 0 0 12px #7dcfff; }
+        .status-dot.lost { color: #f7768e; border-color: #f7768e; background: transparent; }
+        .status-dot.lost::before { background: #f7768e; box-shadow: 0 0 12px #f7768e; }
+        
+        /* Action Ribbon */
+        .action-ribbon { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; width: 100%; }
+        
+        /* Buttons */
+        .btn-safe { background: rgba(187, 154, 247, 0.1); color: #bb9af7; border: 1px solid #bb9af7; padding: 8px 18px; border-radius: 6px; font-weight: 700; font-size: 12px; cursor: pointer; transition: all 0.2s ease; letter-spacing: 1px;}
+        .btn-safe:hover { background: #bb9af7; color: #11121A; box-shadow: 0 0 15px rgba(187, 154, 247, 0.4); }
+        .btn-safe:active { transform: scale(0.95); }
+
+        .btn-danger { background: rgba(247, 118, 142, 0.05); color: #f7768e; border: 1px solid rgba(247, 118, 142, 0.5); padding: 8px 18px; border-radius: 6px; font-weight: 700; font-size: 11px; cursor: pointer; transition: all 0.2s ease; letter-spacing: 1px;}
+        .btn-danger:hover { background: #f7768e; color: #11121A; box-shadow: 0 0 15px rgba(247, 118, 142, 0.4); }
+        .btn-danger:active { transform: scale(0.95); }
+
+        /* Game Vault Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #1E2030; border: 1px solid rgba(187,154,247,0.3); border-radius: 12px; padding: 20px; width: 90%; max-width: 450px; max-height: 70vh; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .modal-header h3 { margin: 0; color: #bb9af7; font-size: 16px; letter-spacing: 1px; }
+        .modal-close { background: none; border: none; color: #565f89; font-size: 24px; cursor: pointer; padding: 0; line-height: 1; }
+        .modal-close:hover { color: #f7768e; }
+        .game-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .game-item { display: flex; justify-content: space-between; align-items: center; background: #0D0E15; padding: 12px 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
+        .game-item-name { color: #c0caf5; font-size: 14px; font-weight: 600; }
+        .game-item-path { color: #565f89; font-size: 11px; margin-top: 4px; }
+        .game-item-actions { display: flex; gap: 8px; }
+        .btn-launch { background: rgba(125, 207, 255, 0.1); color: #7dcfff; border: 1px solid rgba(125, 207, 255, 0.3); padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 11px; cursor: pointer; transition: all 0.2s ease; }
+        .btn-launch:hover { background: #7dcfff; color: #11121A; }
+        .btn-delete { background: rgba(247, 118, 142, 0.1); color: #f7768e; border: 1px solid rgba(247, 118, 142, 0.3); padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 11px; cursor: pointer; transition: all 0.2s ease; }
+        .btn-delete:hover { background: #f7768e; color: #11121A; }
+        .empty-vault { color: #565f89; text-align: center; padding: 30px; font-size: 13px; }
+
+        /* Custom Action Modal */
+        .custom-action-form { display: flex; flex-direction: column; gap: 12px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { color: #7dcfff; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
+        .form-input { background: #0D0E15; border: 1px solid rgba(125, 207, 255, 0.3); color: #c0caf5; padding: 12px; border-radius: 8px; font-size: 14px; font-family: 'Consolas', monospace; outline: none; transition: border-color 0.2s; }
+        .form-input:focus { border-color: #bb9af7; }
+        .emoji-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+        .emoji-option { background: #0D0E15; border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 18px; transition: all 0.2s; }
+        .emoji-option:hover, .emoji-option.selected { background: #bb9af7; border-color: #bb9af7; }
+        .custom-actions-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
+        .custom-action-item { display: flex; justify-content: space-between; align-items: center; background: #0D0E15; padding: 12px 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
+        .custom-action-info { display: flex; align-items: center; gap: 12px; }
+        .custom-action-emoji { font-size: 20px; }
+        .custom-action-name { color: #c0caf5; font-size: 14px; font-weight: 600; }
+        .custom-action-command { color: #565f89; font-size: 11px; font-family: 'Consolas', monospace; margin-top: 4px; }
+
+        /* Workspace Selector */
+        .workspace-select { background: #0D0E15; border: 1px solid rgba(125, 207, 255, 0.3); color: #c0caf5; padding: 10px 14px; border-radius: 8px; font-size: 13px; outline: none; cursor: pointer; }
+        .workspace-select:focus { border-color: #bb9af7; }
+
+        /* Terminal */
+        .terminal { flex: 1; min-height: 0; background: #0D0E15; border: 1px solid #292d3e; border-radius: 12px; padding: 15px; font-family: 'Consolas', monospace; font-size: 13px; color: #bb9af7; overflow-y: auto; box-shadow: inset 0 5px 20px rgba(0,0,0,0.5); }
+        
+        /* Custom Scrollbar */
+        .terminal::-webkit-scrollbar { width: 8px; }
+        .terminal::-webkit-scrollbar-track { background: transparent; }
+        .terminal::-webkit-scrollbar-thumb { background: #292d3e; border-radius: 10px; border: 2px solid #0D0E15; }
+        .terminal::-webkit-scrollbar-thumb:hover { background: #565f89; }
+        
+        .log-row { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.02); word-wrap: break-word; }
+        .log-time { color: #565f89; margin-right: 8px; }
+        .sub-text { color: #565f89; font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 1.5px; }
+    </style>
+</head>
+<body>
+    <div class="titlebar">
+        <span>SV-CONTROL HOST</span>
+        <div class="close-btn" onclick="window.svHost.closeApp()">✕</div>
+    </div>
+    
+    <div class="container">
+        <div id="qr-screen">
+            <h2 style="color: #c0caf5; margin:0; letter-spacing: 3px; font-weight: 600; font-size: 18px;">AWAITING LINK</h2>
+            <div class="qr-box"><img id="qr-img" width="200" src="" /></div>
+            <p class="sub-text">SESSION PIN</p>
+            <div class="pin-display" id="pin-txt">----</div>
+            <p class="sub-text" id="url-txt" style="margin-top:15px; color: #292d3e;"></p>
+        </div>
+
+        <div id="dash-screen">
+            <div class="status-bar" id="status-bar">
+                <div class="status-dot" id="status-text">Link Established</div>
+            </div>
+            
+            <div class="action-ribbon">
+                <span class="sub-text">Live Command Log</span>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-safe" onclick="openCustomActionModal()">⚡ NEW ACTION</button>
+                    <button class="btn-safe" onclick="openVaultModal()">+ ADD GAME</button>
+                </div>
+            </div>
+
+            <div class="terminal" id="terminal"></div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 15px; flex-shrink: 0;">
+                <button class="btn-danger" onclick="window.svHost.forceKick()">FORCE KICK SESSION</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Vault Modal -->
+    <div class="modal-overlay" id="vault-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>🎮 SV-VAULT GAME LIBRARY</h3>
+                <button class="modal-close" onclick="closeVaultModal()">×</button>
+            </div>
+            <div class="game-list" id="game-list"></div>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn-safe" style="flex: 1;" onclick="addGame()">+ ADD NEW GAME</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Action Modal -->
+    <div class="modal-overlay" id="custom-action-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>⚡ CREATE CUSTOM ACTION</h3>
+                <button class="modal-close" onclick="closeCustomActionModal()">×</button>
+            </div>
+            <div class="custom-action-form">
+                <div class="form-group">
+                    <label>EMOJI ICON</label>
+                    <div class="emoji-picker" id="emoji-picker">
+                        <div class="emoji-option" data-emoji="⚡" onclick="selectEmoji(this)">⚡</div>
+                        <div class="emoji-option" data-emoji="🔥" onclick="selectEmoji(this)">🔥</div>
+                        <div class="emoji-option" data-emoji="💻" onclick="selectEmoji(this)">💻</div>
+                        <div class="emoji-option" data-emoji="🔒" onclick="selectEmoji(this)">🔒</div>
+                        <div class="emoji-option" data-emoji="📁" onclick="selectEmoji(this)">📁</div>
+                        <div class="emoji-option" data-emoji="🎯" onclick="selectEmoji(this)">🎯</div>
+                        <div class="emoji-option" data-emoji="🔧" onclick="selectEmoji(this)">🔧</div>
+                        <div class="emoji-option" data-emoji="📊" onclick="selectEmoji(this)">📊</div>
+                        <div class="emoji-option" data-emoji="🚀" onclick="selectEmoji(this)">🚀</div>
+                        <div class="emoji-option" data-emoji="💡" onclick="selectEmoji(this)">💡</div>
+                        <div class="emoji-option" data-emoji="🛑" onclick="selectEmoji(this)">🛑</div>
+                        <div class="emoji-option" data-emoji="✅" onclick="selectEmoji(this)">✅</div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>ACTION NAME</label>
+                    <input type="text" class="form-input" id="action-name" placeholder="e.g., Lock PC" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label>WORKSPACE</label>
+                    <select class="workspace-select" id="action-workspace">
+                        <option value="Default">Default</option>
+                        <option value="Streaming">Streaming</option>
+                        <option value="Dev">Dev</option>
+                        <option value="Gaming">Gaming</option>
+                        <option value="Productivity">Productivity</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>COMMAND (PowerShell or CMD)</label>
+                    <textarea class="form-input" id="action-command" rows="4" placeholder="e.g., powershell.exe -Command &amp;{Add-Type -AssemblyName System.Windows.Forms;[System.Windows.Forms.SendKeys]::SendWait(&quot;^{ESC}&quot;)}"></textarea>
+                </div>
+                <button class="btn-safe" style="margin-top: 10px;" onclick="saveCustomAction()">CREATE ACTION</button>
+            </div>
+            <div class="custom-actions-list" id="custom-actions-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // Timeout State Machine
+        let countdownTimer = null;
+
+        function startCountdown() {
+            let timeLeft = 300; // 5 minutes in seconds
+            const statusText = document.getElementById('status-text');
+            
+            // Clear any old timers to prevent glitching
+            if (countdownTimer) clearInterval(countdownTimer);
+            
+            statusText.innerText = `Link Lost. Scorching in 5:00...`;
+            
+            countdownTimer = setInterval(() => {
+                timeLeft--;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(countdownTimer);
+                    statusText.innerText = 'Session Expired';
+                    return;
+                }
+                
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                // Formats to always show two digits (e.g., "4:09" instead of "4:9")
+                const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                
+                statusText.innerText = `Link Lost. Scorching in ${formattedTime}...`;
+            }, 1000);
+        }
+
+        function stopCountdown() {
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+        }
+
+        // XSS Sanitizer
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, tag => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+            }[tag] || tag));
+        }
+
+        // Hardened & Memory-Safe Terminal Auto-Scroll
+        function logMsg(msg) {
+            const t = document.getElementById('terminal');
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            
+            const safeMsg = escapeHTML(msg);
+            const color = safeMsg.includes('[ALERT]') ? '#f7768e' : (safeMsg.includes('[SYSTEM]') ? '#7dcfff' : '#bb9af7');
+            
+            const row = document.createElement('div');
+            row.className = 'log-row';
+            row.innerHTML = `<span class="log-time">[${time}]</span> <span style="color: ${color};">${safeMsg}</span>`;
+            
+            t.appendChild(row);
+
+            if (t.children.length > 50) t.removeChild(t.firstChild);
+
+            requestAnimationFrame(() => {
+                t.scrollTop = t.scrollHeight;
+            });
+        }
+
+        async function addGame() {
+            const game = await window.svHost.addGameDialog();
+            if (game) {
+                logMsg(`[SYSTEM] Added ${game.name} to Vault.`);
+                renderGameList();
+            }
+        }
+
+        async function renderGameList() {
+            const games = await window.svHost.getGameVault();
+            const listEl = document.getElementById('game-list');
+            
+            if (games.length === 0) {
+                listEl.innerHTML = '<div class="empty-vault">No games in vault. Add your first game!</div>';
+                return;
+            }
+            
+            listEl.innerHTML = games.map(game => `
+                <div class="game-item">
+                    <div>
+                        <div class="game-item-name">${escapeHTML(game.name)}</div>
+                        <div class="game-item-path">${escapeHTML(game.path)}</div>
+                    </div>
+                    <div class="game-item-actions">
+                        <button class="btn-launch" onclick="launchGame('${game.path.replace(/\\/g, '\\\\')}')">Launch</button>
+                        <button class="btn-delete" onclick="removeGame('${game.path.replace(/\\/g, '\\\\')}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function launchGame(gamePath) {
+            const success = await window.svHost.launchGame(gamePath);
+            if (success) {
+                logMsg(`[SYSTEM] Launched: ${gamePath.split('\\').pop()}`);
+            } else {
+                logMsg(`[ALERT] Failed to launch game`);
+            }
+        }
+
+        async function removeGame(gamePath) {
+            await window.svHost.removeGameFromVault(gamePath);
+            logMsg(`[SYSTEM] Removed game from vault`);
+            renderGameList();
+        }
+
+        function openVaultModal() {
+            document.getElementById('vault-modal').classList.add('active');
+            renderGameList();
+        }
+
+        function closeVaultModal() {
+            document.getElementById('vault-modal').classList.remove('active');
+        }
+
+        window.svHost.onShowQr((data) => {
+            stopCountdown(); // Stop timer if we get sent back to QR screen
+            document.getElementById('dash-screen').style.display = 'none';
+            document.getElementById('qr-screen').style.display = 'flex';
+            document.getElementById('qr-img').src = data.qr;
+            document.getElementById('pin-txt').innerText = data.pin;
+            document.getElementById('url-txt').innerText = data.url;
+            document.getElementById('terminal').innerHTML = ''; 
+        });
+
+        window.svHost.onDeviceConnected((msg) => {
+            stopCountdown(); // Instantly kill countdown on reconnect
+            document.getElementById('qr-screen').style.display = 'none';
+            document.getElementById('dash-screen').style.display = 'flex';
+            document.getElementById('status-bar').style.borderColor = 'rgba(125, 207, 255, 0.3)';
+            document.getElementById('status-bar').style.background = 'rgba(125, 207, 255, 0.05)';
+            document.getElementById('status-text').innerText = 'Link Established';
+            document.getElementById('status-text').className = 'status-dot';
+            logMsg(msg);
+        });
+
+        window.svHost.onDeviceDisconnected(() => {
+            document.getElementById('status-bar').style.borderColor = 'rgba(247, 118, 142, 0.3)';
+            document.getElementById('status-bar').style.background = 'rgba(247, 118, 142, 0.05)';
+            document.getElementById('status-text').className = 'status-dot lost';
+            logMsg('[ALERT] Connection lost. Waiting for reconnect...');
+
+            // Trigger the live countdown
+            startCountdown();
+        });
+
+        window.svHost.onLogAction((msg) => logMsg(msg));
+        window.svHost.onVaultUpdated(() => renderGameList());
+        window.svHost.onCustomActionsUpdated(() => renderCustomActionsList());
+
+        // Custom Action Functions
+        let selectedEmoji = '⚡';
+
+        function selectEmoji(element) {
+            document.querySelectorAll('.emoji-option').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedEmoji = element.dataset.emoji;
+        }
+
+        function openCustomActionModal() {
+            document.getElementById('custom-action-modal').classList.add('active');
+            renderCustomActionsList();
+        }
+
+        function closeCustomActionModal() {
+            document.getElementById('custom-action-modal').classList.remove('active');
+            document.getElementById('action-name').value = '';
+            document.getElementById('action-command').value = '';
+            selectedEmoji = '⚡';
+            document.querySelectorAll('.emoji-option').forEach(el => el.classList.remove('selected'));
+        }
+
+        async function saveCustomAction() {
+            const name = document.getElementById('action-name').value.trim();
+            const command = document.getElementById('action-command').value.trim();
+            const workspace = document.getElementById('action-workspace').value;
+
+            if (!name || !command) {
+                logMsg('[ALERT] Please fill in all fields for custom action');
+                return;
+            }
+
+            const action = await window.svHost.saveCustomAction({ name, emoji: selectedEmoji, command, workspace });
+            if (action) {
+                logMsg(`[SYSTEM] Created custom action: ${action.name} (${action.workspace})`);
+                renderCustomActionsList();
+                document.getElementById('action-name').value = '';
+                document.getElementById('action-command').value = '';
+            }
+        }
+
+        async function renderCustomActionsList() {
+            const actions = await window.svHost.getCustomActions();
+            const listEl = document.getElementById('custom-actions-list');
+
+            if (actions.length === 0) {
+                listEl.innerHTML = '<div class="empty-vault">No custom actions yet. Create your first macro!</div>';
+                return;
+            }
+
+            listEl.innerHTML = actions.map(action => `
+                <div class="custom-action-item">
+                    <div class="custom-action-info">
+                        <span class="custom-action-emoji">${escapeHTML(action.emoji)}</span>
+                        <div>
+                            <div class="custom-action-name">${escapeHTML(action.name)}</div>
+                            <div class="custom-action-command">${escapeHTML(action.command)}</div>
+                        </div>
+                    </div>
+                    <button class="btn-delete" onclick="deleteCustomAction('${action.id}')">Delete</button>
+                </div>
+            `).join('');
+        }
+
+        async function deleteCustomAction(actionId) {
+            await window.svHost.deleteCustomAction(actionId);
+            logMsg('[SYSTEM] Custom action deleted');
+            renderCustomActionsList();
+        }
+    </script>
+</body>
+</html>

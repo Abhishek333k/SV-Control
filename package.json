@@ -1,0 +1,20 @@
+{
+  "name": "sv-control",
+  "version": "1.0.0",
+  "description": "SV-Control Engine",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "ip": "^2.0.1",
+    "portfinder": "^1.0.38",
+    "socket.io": "^4.8.3",
+    "sudo-prompt": "^9.2.1"
+  },
+  "devDependencies": {
+    "electron": "^41.0.3",
+    "qrcode": "^1.5.4"
+  }
+}

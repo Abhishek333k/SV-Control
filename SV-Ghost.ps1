@@ -1,0 +1,1 @@
+# SV-Ghost.ps1 - Placeholder script for RAM flush\n# This script can be customized to clear memory caches or perform other optimizations.\nWrite-Output "[SV-Ghost] RAM flush executed. (Placeholder)"\n
